@@ -32,13 +32,10 @@ jobs:
 
       - name: Type check — mypy
         run: |
-          mypy services/submission-service/app \
-               services/ai-agent-service/app \
-               services/approval-service/app \
-               services/payment-service/app \
-               services/audit-service/app \
-               --ignore-missing-imports \
-               --explicit-package-bases
+          for service in submission-service ai-agent-service \
+            approval-service payment-service audit-service; do
+            (cd services/$service && mypy app --ignore-missing-imports)
+          done
 
       - name: Unit tests — all services
         env:
