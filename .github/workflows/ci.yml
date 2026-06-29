@@ -1,0 +1,80 @@
+name: CI
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+    branches: [main]
+
+jobs:
+  quality-gates:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies — all services
+        run: |
+          for service in submission-service ai-agent-service \
+            approval-service payment-service audit-service; do
+            pip install -r services/$service/requirements.txt \
+              --quiet
+          done
+          pip install ruff mypy pytest pytest-asyncio --quiet
+
+      - name: Lint — ruff
+        run: ruff check services/
+
+      - name: Type check — mypy
+        run: |
+          mypy services/submission-service/app \
+               services/ai-agent-service/app \
+               services/approval-service/app \
+               services/payment-service/app \
+               services/audit-service/app \
+               --ignore-missing-imports
+
+      - name: Unit tests — all services
+        env:
+          LLM_MOCK: "true"
+          PAYMENT_FAILURE_INJECT: ""
+        run: |
+          pytest services/submission-service/tests \
+                 services/ai-agent-service/tests \
+                 services/approval-service/tests \
+                 services/payment-service/tests \
+                 services/audit-service/tests \
+                 -v --tb=short
+
+      - name: Build Docker images
+        run: docker compose build
+
+  verify:
+    runs-on: ubuntu-latest
+    needs: quality-gates
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Start system
+        run: |
+          docker compose up -d --wait
+          sleep 15
+
+      - name: Run verification script
+        env:
+          PAYMENT_FAILURE_INJECT: "inv-1012"
+        run: python scripts/verify.py
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs --tail=50
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v

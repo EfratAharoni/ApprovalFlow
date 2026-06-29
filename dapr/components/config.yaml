@@ -1,0 +1,37 @@
+apiVersion: dapr.io/v1alpha1
+kind: Configuration
+metadata:
+  name: approvalflow-config
+spec:
+  tracing:
+    samplingRate: "1"
+    zipkin:
+      endpointAddress: ""
+  # Policy thresholds — externally configurable without redeploy (M13)
+  # Change these values here and restart the Dapr sidecars only
+---
+apiVersion: dapr.io/v1alpha1
+kind: Component
+metadata:
+  name: policy-config
+spec:
+  type: configuration.redis
+  version: v1
+  metadata:
+    - name: redisHost
+      value: redis:6379
+    - name: redisPassword
+      value: ""
+    - name: defaultItems
+      value: |
+        [
+          {"key": "AUTONOMY_CEILING",    "value": "250"},
+          {"key": "AUTONOMY_CONFIDENCE", "value": "0.80"},
+          {"key": "FX_HARD_STOP",        "value": "1000"},
+          {"key": "RECEIPT_THRESHOLD",   "value": "25"},
+          {"key": "SAAS_CAP",            "value": "200"},
+          {"key": "HW_CAP",              "value": "1000"},
+          {"key": "MEAL_PER_ATTENDEE",   "value": "75"},
+          {"key": "CLIENT_ENTERTAIN_CAP","value": "500"},
+          {"key": "TRAVEL_MANAGER_CAP",  "value": "1500"}
+        ]

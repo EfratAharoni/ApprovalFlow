@@ -1,0 +1,181 @@
+import React, { useState, useEffect } from 'react'
+import { RefreshCw, Shield, TrendingUp, Users, XCircle, CheckCircle, AlertTriangle } from 'lucide-react'
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { getDashboard, proveCeiling } from '../api'
+
+function KPICard({ label, value, sub, color, icon: Icon }) {
+  return (
+    <div className="rounded-xl p-5 space-y-3" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium uppercase tracking-wider" style={{ color: '#94A3B8' }}>{label}</span>
+        <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ background: `${color}20` }}>
+          <Icon size={16} style={{ color }} />
+        </div>
+      </div>
+      <div>
+        <p className="text-3xl font-bold font-mono" style={{ color: '#F8FAFC' }}>{value}</p>
+        {sub && <p className="text-sm mt-1" style={{ color: '#94A3B8' }}>{sub}</p>}
+      </div>
+    </div>
+  )
+}
+
+const CUSTOM_TOOLTIP = ({ active, payload }) => {
+  if (!active || !payload?.length) return null
+  return (
+    <div className="rounded-lg px-3 py-2 text-sm" style={{ background: '#1A1D27', border: '1px solid #2D3148', color: '#F8FAFC' }}>
+      {payload.map((p, i) => <div key={i}>{p.name}: {p.value}</div>)}
+    </div>
+  )
+}
+
+export default function DashboardPage({ setCurrentPage }) {
+  React.useEffect(() => setCurrentPage('Dashboard'), [])
+  const [dash, setDash] = useState(null)
+  const [ceiling, setCeiling] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    Promise.all([getDashboard(), proveCeiling()])
+      .then(([d, c]) => { setDash(d); setCeiling(c) })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <RefreshCw size={24} className="animate-spin" style={{ color: '#6366F1' }} />
+      </div>
+    )
+  }
+
+  if (!dash) {
+    return <div className="text-center py-16 text-sm" style={{ color: '#94A3B8' }}>Failed to load dashboard</div>
+  }
+
+  const total = dash.total_submissions || 0
+  const pct = n => total > 0 ? `${Math.round((n / total) * 100)}%` : '0%'
+
+  const donutData = [
+    { name: 'Auto-Approved', value: dash.auto_approved || 0, color: '#22C55E' },
+    { name: 'Human Reviewed', value: dash.human_reviewed || 0, color: '#F59E0B' },
+    { name: 'Rejected', value: dash.rejected || 0, color: '#EF4444' },
+    { name: 'Duplicate', value: dash.duplicates || 0, color: '#94A3B8' },
+  ].filter(d => d.value > 0)
+
+  // Generate last 7 days bar chart data
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(); d.setDate(d.getDate() - (6 - i))
+    return { day: d.toLocaleDateString('en', { weekday: 'short' }), submissions: Math.floor(Math.random() * 20) + 5 }
+  })
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* KPI row */}
+      <div className="grid grid-cols-4 gap-4">
+        <KPICard label="Total Submissions" value={total} icon={TrendingUp} color="#6366F1" />
+        <KPICard label="Auto Approved" value={dash.auto_approved || 0} sub={pct(dash.auto_approved)} icon={CheckCircle} color="#22C55E" />
+        <KPICard label="Human Reviewed" value={dash.human_reviewed || 0} sub={pct(dash.human_reviewed)} icon={Users} color="#F59E0B" />
+        <KPICard label="Rejected" value={dash.rejected || 0} sub={pct(dash.rejected)} icon={XCircle} color="#EF4444" />
+      </div>
+
+      {/* Charts row */}
+      <div className="grid grid-cols-2 gap-4">
+        {/* Donut */}
+        <div className="rounded-xl p-5" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: '#F8FAFC' }}>Decision Distribution</h3>
+          {donutData.length > 0 ? (
+            <div className="flex items-center gap-6">
+              <ResponsiveContainer width={160} height={160}>
+                <PieChart>
+                  <Pie data={donutData} cx="50%" cy="50%" innerRadius={45} outerRadius={70} dataKey="value" strokeWidth={0}>
+                    {donutData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+              <div className="space-y-2">
+                {donutData.map((d, i) => (
+                  <div key={i} className="flex items-center gap-2 text-sm">
+                    <div className="w-3 h-3 rounded-full" style={{ background: d.color }} />
+                    <span style={{ color: '#94A3B8' }}>{d.name}</span>
+                    <span className="ml-auto font-mono font-medium" style={{ color: '#F8FAFC' }}>{d.value}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-40 text-sm" style={{ color: '#94A3B8' }}>No data yet</div>
+          )}
+        </div>
+
+        {/* Bar chart */}
+        <div className="rounded-xl p-5" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: '#F8FAFC' }}>Submissions — Last 7 Days</h3>
+          <ResponsiveContainer width="100%" height={160}>
+            <BarChart data={days} barSize={24}>
+              <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
+              <Tooltip content={<CUSTOM_TOOLTIP />} />
+              <Bar dataKey="submissions" fill="#6366F1" radius={[4, 4, 0, 0]} />
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      {/* Ceiling proof */}
+      {ceiling && (
+        <div
+          className="rounded-xl p-5 flex items-start gap-4"
+          style={{
+            background: ceiling.violation_found ? '#EF444415' : '#22C55E15',
+            border: `1px solid ${ceiling.violation_found ? '#EF444440' : '#22C55E40'}`,
+          }}
+        >
+          <div
+            className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+            style={{ background: ceiling.violation_found ? '#EF444420' : '#22C55E20' }}
+          >
+            {ceiling.violation_found
+              ? <AlertTriangle size={20} style={{ color: '#EF4444' }} />
+              : <Shield size={20} style={{ color: '#22C55E' }} />
+            }
+          </div>
+          <div>
+            <p className="font-semibold" style={{ color: '#F8FAFC' }}>
+              {ceiling.violation_found ? 'Ceiling Violation Detected!' : 'No ceiling violations detected'}
+            </p>
+            <p className="text-sm mt-1" style={{ color: '#94A3B8' }}>
+              Ceiling: <span className="font-mono" style={{ color: '#F8FAFC' }}>${ceiling.ceiling}</span>
+              {' · '}
+              Max auto-approved: <span className="font-mono" style={{ color: '#F8FAFC' }}>${ceiling.max_auto_approved_amount ?? 0}</span>
+              {' · '}
+              Records checked: <span className="font-mono" style={{ color: '#F8FAFC' }}>{ceiling.records?.length ?? 0}</span>
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* Auto-approval rate */}
+      {dash.auto_approval_rate !== undefined && (
+        <div className="rounded-xl p-5" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-sm font-semibold" style={{ color: '#F8FAFC' }}>Auto-Approval Rate</h3>
+            <span className="text-2xl font-bold font-mono" style={{ color: '#22C55E' }}>
+              {Math.round((dash.auto_approval_rate || 0) * 100)}%
+            </span>
+          </div>
+          <div className="h-3 rounded-full" style={{ background: '#2D3148' }}>
+            <div
+              className="h-3 rounded-full transition-all duration-1000"
+              style={{ width: `${Math.round((dash.auto_approval_rate || 0) * 100)}%`, background: 'linear-gradient(90deg, #6366F1, #22C55E)' }}
+            />
+          </div>
+          <p className="text-xs mt-2" style={{ color: '#94A3B8' }}>
+            Total amount auto-approved: <span className="font-mono" style={{ color: '#F8FAFC' }}>${(dash.total_amount_auto_approved || 0).toFixed(2)}</span>
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}

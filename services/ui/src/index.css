@@ -1,0 +1,29 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: #0F1117;
+  color: #F8FAFC;
+  font-family: 'Inter', sans-serif;
+}
+
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1A1D27;
+}
+::-webkit-scrollbar-thumb {
+  background: #2D3148;
+  border-radius: 3px;
+}
+
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 1; }
+  70% { transform: scale(1); opacity: 0; }
+  100% { transform: scale(0.95); opacity: 0; }
+}
+.pulse-ring {
+  animation: pulse-ring 1.5s ease-in-out infinite;
+}

@@ -1,0 +1,311 @@
+# ApprovalFlow — docker compose up brings everything up (M4)
+
+services:
+
+  # ─── Infrastructure ───────────────────────────────────────
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - redis_data:/data
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: approvalflow
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-approvalflow_dev}
+      POSTGRES_DB: approvalflow
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U approvalflow"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql
+
+  placement:
+    image: "daprio/dapr:1.13.0"
+    command: ["./placement", "--port", "50006", "--log-level", "warn"]
+    ports:
+      - "50006:50006"
+
+  # ─── API Gateway ──────────────────────────────────────────
+
+  api-gateway:
+    build: ./services/api-gateway
+    ports:
+      - "8000:80"
+    depends_on:
+      submission-service:
+        condition: service_healthy
+      approval-service:
+        condition: service_healthy
+      audit-service:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ─── Submission Service ───────────────────────────────────
+
+  submission-service:
+    build: ./services/submission-service
+    ports:
+      - "8001:8001"
+    environment:
+      SERVICE_NAME: submission-service
+      DATABASE_URL: postgresql+asyncpg://approvalflow:${POSTGRES_PASSWORD:-approvalflow_dev}@postgres:5432/approvalflow
+      DAPR_HTTP_PORT: "3501"
+      DAPR_GRPC_PORT: "50001"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  submission-service-dapr:
+    image: "daprio/daprd:1.13.0"
+    network_mode: "service:submission-service"
+    command:
+      - "./daprd"
+      - "--app-id=submission-service"
+      - "--app-port=8001"
+      - "--dapr-http-port=3501"
+      - "--dapr-grpc-port=50001"
+      - "--components-path=/components"
+      - "--placement-host-address=placement:50006"
+      - "--log-level=warn"
+    volumes:
+      - ./dapr/components:/components
+    depends_on:
+      submission-service:
+        condition: service_healthy
+      placement:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ─── AI Agent Service ─────────────────────────────────────
+
+  ai-agent-service:
+    build: ./services/ai-agent-service
+    ports:
+      - "8002:8002"
+    environment:
+      SERVICE_NAME: ai-agent-service
+      DATABASE_URL: postgresql+asyncpg://approvalflow:${POSTGRES_PASSWORD:-approvalflow_dev}@postgres:5432/approvalflow
+      DAPR_HTTP_PORT: "3502"
+      DAPR_GRPC_PORT: "50002"
+      LLM_PROVIDER: ${LLM_PROVIDER:-gemini}
+      LLM_MODEL: ${LLM_MODEL:-gemini/gemini-1.5-flash}
+      LLM_API_KEY: ${LLM_API_KEY:-}
+      LLM_MOCK: ${LLM_MOCK:-true}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  ai-agent-service-dapr:
+    image: "daprio/daprd:1.13.0"
+    network_mode: "service:ai-agent-service"
+    command:
+      - "./daprd"
+      - "--app-id=ai-agent-service"
+      - "--app-port=8002"
+      - "--dapr-http-port=3502"
+      - "--dapr-grpc-port=50002"
+      - "--components-path=/components"
+      - "--placement-host-address=placement:50006"
+      - "--log-level=warn"
+    volumes:
+      - ./dapr/components:/components
+    depends_on:
+      ai-agent-service:
+        condition: service_healthy
+      placement:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ─── Approval Service ─────────────────────────────────────
+
+  approval-service:
+    build: ./services/approval-service
+    ports:
+      - "8003:8003"
+    environment:
+      SERVICE_NAME: approval-service
+      DATABASE_URL: postgresql+asyncpg://approvalflow:${POSTGRES_PASSWORD:-approvalflow_dev}@postgres:5432/approvalflow
+      DAPR_HTTP_PORT: "3503"
+      DAPR_GRPC_PORT: "50003"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  approval-service-dapr:
+    image: "daprio/daprd:1.13.0"
+    network_mode: "service:approval-service"
+    command:
+      - "./daprd"
+      - "--app-id=approval-service"
+      - "--app-port=8003"
+      - "--dapr-http-port=3503"
+      - "--dapr-grpc-port=50003"
+      - "--components-path=/components"
+      - "--placement-host-address=placement:50006"
+      - "--log-level=warn"
+    volumes:
+      - ./dapr/components:/components
+    depends_on:
+      approval-service:
+        condition: service_healthy
+      placement:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ─── Payment Service ──────────────────────────────────────
+
+  payment-service:
+    build: ./services/payment-service
+    ports:
+      - "8004:8004"
+    environment:
+      SERVICE_NAME: payment-service
+      DATABASE_URL: postgresql+asyncpg://approvalflow:${POSTGRES_PASSWORD:-approvalflow_dev}@postgres:5432/approvalflow
+      DAPR_HTTP_PORT: "3504"
+      DAPR_GRPC_PORT: "50004"
+      PAYMENT_FAILURE_INJECT: ${PAYMENT_FAILURE_INJECT:-false}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  payment-service-dapr:
+    image: "daprio/daprd:1.13.0"
+    network_mode: "service:payment-service"
+    command:
+      - "./daprd"
+      - "--app-id=payment-service"
+      - "--app-port=8004"
+      - "--dapr-http-port=3504"
+      - "--dapr-grpc-port=50004"
+      - "--components-path=/components"
+      - "--placement-host-address=placement:50006"
+      - "--log-level=warn"
+    volumes:
+      - ./dapr/components:/components
+    depends_on:
+      payment-service:
+        condition: service_healthy
+      placement:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ─── Audit Service ────────────────────────────────────────
+
+  audit-service:
+    build: ./services/audit-service
+    ports:
+      - "8005:8005"
+    environment:
+      SERVICE_NAME: audit-service
+      DATABASE_URL: postgresql+asyncpg://approvalflow:${POSTGRES_PASSWORD:-approvalflow_dev}@postgres:5432/approvalflow
+      DAPR_HTTP_PORT: "3505"
+      DAPR_GRPC_PORT: "50005"
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  audit-service-dapr:
+    image: "daprio/daprd:1.13.0"
+    network_mode: "service:audit-service"
+    command:
+      - "./daprd"
+      - "--app-id=audit-service"
+      - "--app-port=8005"
+      - "--dapr-http-port=3505"
+      - "--dapr-grpc-port=50005"
+      - "--components-path=/components"
+      - "--placement-host-address=placement:50006"
+      - "--log-level=warn"
+    volumes:
+      - ./dapr/components:/components
+    depends_on:
+      audit-service:
+        condition: service_healthy
+      placement:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  # ─── UI ───────────────────────────────────────────────────
+
+  ui:
+    build: ./services/ui
+    ports:
+      - "3000:80"
+    depends_on:
+      - api-gateway
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
