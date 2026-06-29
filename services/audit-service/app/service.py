@@ -4,7 +4,6 @@ AuditService — append-only event log with analytics.
 All storage is injected so the service is fully unit-testable offline.
 """
 import logging
-import uuid
 from datetime import datetime, timezone
 from typing import Callable, Optional
 

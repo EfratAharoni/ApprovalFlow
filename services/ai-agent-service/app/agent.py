@@ -11,13 +11,12 @@ from abc import ABC, abstractmethod
 from typing import Dict, Optional
 
 import litellm
-
-litellm.drop_params = True  # silently drop unsupported params (e.g. tools on Gemini)
-
 from .config import settings
 from .policy import PolicyConfig
-from .schemas import AgentDecision, PolicyViolation, SubmissionEvent
+from .schemas import AgentDecision, SubmissionEvent
 from .tools import TOOL_SCHEMAS, execute_tool
+
+litellm.drop_params = True  # silently drop unsupported params (e.g. tools on Gemini)
 
 logger = logging.getLogger(__name__)
 

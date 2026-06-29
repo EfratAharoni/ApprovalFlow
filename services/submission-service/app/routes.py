@@ -30,7 +30,6 @@ async def create_submission(
         date=req.date,
     )
 
-    log = logger.bind if hasattr(logger, "bind") else lambda **kw: logger
     logger.info(
         "submission received",
         extra={

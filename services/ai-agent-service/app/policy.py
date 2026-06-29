@@ -1,6 +1,5 @@
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from decimal import Decimal
-from pathlib import Path
 
 # Stable rule texts — matches policy.md §1–§6
 POLICY_RULES: dict[str, str] = {

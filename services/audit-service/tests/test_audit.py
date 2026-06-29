@@ -6,7 +6,7 @@ All storage is replaced with an in-memory mock.
 """
 import uuid
 from datetime import datetime, timezone, timedelta
-from typing import Dict, List, Optional
+from typing import List, Optional
 
 import pytest
 

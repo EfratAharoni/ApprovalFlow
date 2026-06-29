@@ -161,7 +161,7 @@ async def test_inv1006_math_mismatch():
 @pytest.mark.asyncio
 async def test_low_confidence_escalates():
     """If the agent returns low confidence, escalate even if item would otherwise pass."""
-    from app.schemas import AgentDecision, PolicyViolation as PV
+    from app.schemas import AgentDecision
     low_conf_agent = MockAgent(responses={
         "key-1001": AgentDecision(
             reasoning="Ambiguous category, not sure.",

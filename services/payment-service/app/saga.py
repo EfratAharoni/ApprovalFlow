@@ -15,7 +15,7 @@ Failure in any step triggers compensations in reverse order.
 import logging
 import uuid
 from decimal import Decimal
-from typing import Callable, Optional
+from typing import Callable
 
 logger = logging.getLogger(__name__)
 

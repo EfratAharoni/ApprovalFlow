@@ -1,4 +1,3 @@
-import uuid
 from decimal import Decimal
 from typing import Optional, List
 from pydantic import BaseModel, Field, model_validator

@@ -5,8 +5,6 @@ No database, no Dapr, no network. All I/O is replaced with an in-memory mock.
 """
 from typing import Dict, Optional
 
-import pytest
-
 from app.subscriber import SubmissionStatusService
 
 
