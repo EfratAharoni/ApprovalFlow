@@ -17,7 +17,7 @@ from .schemas import ApprovalDecidedEvent, DecisionMadeEvent
 configure_logging()
 logger = logging.getLogger(__name__)
 
-_saga: PaymentSaga = None
+_saga: PaymentSaga = None  # type: ignore[assignment]
 
 
 def _category_to_department(category: str) -> str:

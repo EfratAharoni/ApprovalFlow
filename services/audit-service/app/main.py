@@ -14,7 +14,7 @@ from .service import AuditService
 configure_logging()
 logger = logging.getLogger(__name__)
 
-_svc: AuditService = None
+_svc: AuditService = None  # type: ignore[assignment]
 
 _SUBSCRIBED_TOPICS = [
     "submission.created",

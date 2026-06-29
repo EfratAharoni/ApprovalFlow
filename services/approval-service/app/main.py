@@ -16,7 +16,7 @@ from .service import ApprovalService
 configure_logging()
 logger = logging.getLogger(__name__)
 
-_svc: ApprovalService = None
+_svc: ApprovalService = None  # type: ignore[assignment]
 
 
 def _make_service() -> ApprovalService:
