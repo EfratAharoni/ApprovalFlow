@@ -42,12 +42,10 @@ jobs:
           LLM_MOCK: "true"
           PAYMENT_FAILURE_INJECT: ""
         run: |
-          pytest services/submission-service/tests \
-                 services/ai-agent-service/tests \
-                 services/approval-service/tests \
-                 services/payment-service/tests \
-                 services/audit-service/tests \
-                 -v --tb=short
+          for service in submission-service ai-agent-service \
+            approval-service payment-service audit-service; do
+            (cd services/$service && pytest tests -v --tb=short)
+          done
 
       - name: Build Docker images
         run: docker compose build
