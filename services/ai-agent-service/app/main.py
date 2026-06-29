@@ -115,8 +115,8 @@ async def handle_submission_created(request: Request) -> dict:
 
     decision = await route_submission(
         event=event,
-        policy=_policy,
-        agent=_agent,
+        policy=_policy,  # type: ignore[arg-type]
+        agent=_agent,    # type: ignore[arg-type]
         is_duplicate_fn=_is_duplicate,
     )
 
