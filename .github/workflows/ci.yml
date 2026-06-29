@@ -37,7 +37,8 @@ jobs:
                services/approval-service/app \
                services/payment-service/app \
                services/audit-service/app \
-               --ignore-missing-imports
+               --ignore-missing-imports \
+               --explicit-package-bases
 
       - name: Unit tests — all services
         env:
