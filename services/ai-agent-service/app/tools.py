@@ -4,7 +4,7 @@ Each tool is defined as a Python function + a JSON schema dict for LiteLLM tool_
 """
 import json
 from decimal import Decimal
-from .policy import fetch_policy_clause as _fetch_rule
+from .rag import search_policy as _search_policy
 
 _FX_RATES: dict[str, Decimal] = {
     "USD": Decimal("1.00"),
@@ -20,8 +20,9 @@ _KNOWN_VENDORS: set[str] = {
 }
 
 
-def fetch_policy_clause(rule_id: str) -> str:
-    return _fetch_rule(rule_id)
+def search_policy(query: str) -> list:
+    """Semantic search over policy rules — returns top-3 matches."""
+    return _search_policy(query, top_k=3)
 
 
 def lookup_vendor(vendor_name: str) -> dict:
@@ -36,8 +37,8 @@ def convert_currency(amount: float, from_currency: str) -> dict:
 
 
 def execute_tool(name: str, arguments: dict) -> str:
-    if name == "fetch_policy_clause":
-        return fetch_policy_clause(arguments.get("rule_id", ""))
+    if name == "search_policy":
+        return json.dumps(search_policy(arguments.get("query", "")))
     if name == "lookup_vendor":
         return json.dumps(lookup_vendor(arguments.get("vendor_name", "")))
     if name == "convert_currency":
@@ -50,14 +51,24 @@ TOOL_SCHEMAS = [
     {
         "type": "function",
         "function": {
-            "name": "fetch_policy_clause",
-            "description": "Get the text of a specific expense policy rule by its rule_id (e.g. MEAL-01, SAAS-01, HW-02).",
+            "name": "search_policy",
+            "description": (
+                "Semantic search over company expense policy rules. "
+                "Returns the top-3 most relevant rules (rule_id, text, score) "
+                "for a natural-language query. Use this to find rules you are unsure about."
+            ),
             "parameters": {
                 "type": "object",
                 "properties": {
-                    "rule_id": {"type": "string", "description": "The stable rule identifier, e.g. 'MEAL-01'"}
+                    "query": {
+                        "type": "string",
+                        "description": (
+                            "Natural-language description of what you are looking for, "
+                            "e.g. 'meal expense with attendees' or 'foreign currency limit'"
+                        ),
+                    }
                 },
-                "required": ["rule_id"],
+                "required": ["query"],
             },
         },
     },

@@ -90,6 +90,15 @@ docker compose up -d --wait
 python scripts/verify.py
 ```
 
+### Concurrent load test (N1 / M6)
+
+```bash
+python scripts/load_test.py          # 10 concurrent submissions
+python scripts/load_test.py --n 25   # triggers Nginx rate-limiter (burst=20)
+```
+
+Validates: no 5xx under concurrency, rate-limiter fires at burst > 20, no duplicate tracking_ids.
+
 Expected output:
 
 ```
@@ -105,6 +114,21 @@ Expected output:
 | Duplicate | INV-1007 — re-submit same invoice | Same `tracking_id` returned, paid once |
 | Payment failure | INV-1012 — $9,500 hardware | `PAYMENT_FAILED`, budget fully restored |
 
+## API Reference (OpenAPI / Swagger)
+
+FastAPI generates interactive API docs automatically. With the system running:
+
+| Service | Swagger UI | Port |
+|---|---|---|
+| Submission Service | http://localhost:8001/docs | 8001 |
+| AI Agent Service | http://localhost:8002/docs | 8002 |
+| Approval Service | http://localhost:8003/docs | 8003 |
+| Payment Service | http://localhost:8004/docs | 8004 |
+| Audit Service | http://localhost:8005/docs | 8005 |
+
+> The API Gateway (port 8000) proxies `/submissions`, `/approvals`, and `/audit` routes.
+> Individual service `/docs` endpoints are accessible directly for development.
+
 ## Architecture Decisions
 
 See [`docs/adr/`](docs/adr/) for all key decisions:
@@ -116,6 +140,7 @@ See [`docs/adr/`](docs/adr/) for all key decisions:
 - **ADR-005** — Dapr state store for durable HITL pause/resume
 - **ADR-006** — Shared PostgreSQL with separate schemas
 - **ADR-007** — Nginx API gateway
+- **ADR-008** — RAG over policy (semantic search, N5)
 
 ## Autonomy Posture
 
@@ -133,3 +158,30 @@ The ceiling is enforced in deterministic code — the LLM advisory layer never w
 curl http://localhost:8000/audit/prove-ceiling
 # → {"violation_found": false, "ceiling": 250, "checked": N}
 ```
+
+## What I Would Do With Another Week
+
+**N1 — JWT Authentication:**
+Add a `python-jose` middleware layer in the API Gateway (or per-service) that validates
+RS256 tokens. The `submitted_by` and `decided_by` fields are already propagated through
+the event chain — connecting them to a real identity provider (e.g., Auth0) would be
+straightforward. Estimated: 1 day.
+
+**N4 — OpenTelemetry end-to-end trace:**
+Instrument every FastAPI service with `opentelemetry-sdk` + `opentelemetry-instrumentation-fastapi`.
+A single `trace_id` would flow from the Gateway through pub/sub to every service,
+making the choreography flow visible in a Jaeger or Grafana Tempo dashboard.
+`correlation_id` is already threaded through every event — it would become the OTel trace ID.
+Estimated: 1.5 days.
+
+**RAG quality improvement (N5 follow-up):**
+Replace the current pure-vector search with a hybrid BM25 + vector approach using
+Reciprocal Rank Fusion. The current model (all-MiniLM-L6-v2) misses MEAL-03 for
+informal queries like "happy hour beverages" — hybrid search would fix this without
+retraining. Estimated: 0.5 days. See [ADR-008](docs/adr/ADR-008.md) for full analysis.
+
+**Better department budget enforcement (M13):**
+The current budget check uses Dapr state with CAS (optimistic locking), which is correct
+but not tested under real concurrent load. Adding a chaos test (inject concurrent approvals
+for the same department simultaneously) would prove the CAS holds under race conditions.
+Estimated: 0.5 days.

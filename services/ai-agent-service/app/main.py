@@ -12,6 +12,7 @@ from .database import AsyncSessionLocal, create_tables
 from .logging_config import configure_logging
 from .models import Decision
 from .policy import load_policy_config
+from .rag import preload_index
 from .router import route_submission
 from .schemas import SubmissionEvent
 from . import dapr_client
@@ -28,6 +29,7 @@ async def lifespan(app: FastAPI):
     global _agent, _policy
     logger.info("ai-agent-service starting", extra={"service": settings.service_name})
     await create_tables()
+    preload_index()  # build sentence-transformer embeddings at startup (avoids cold-start)
     _agent = create_agent()
     _policy = load_policy_config()
     logger.info(
