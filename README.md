@@ -156,3 +156,34 @@ The ceiling is enforced in deterministic code — the LLM advisory layer never w
 curl http://localhost:8000/audit/prove-ceiling
 # → {"violation_found": false, "ceiling": 250, "checked": N}
 ```
+
+## What I'd Do With More Time
+
+Given another week, I'd prioritize three things, roughly in this order:
+
+**1. RAG quality.** The current embedding-only retrieval has a known
+gap, documented in ADR-008 — a query like "team happy hour beverages"
+misses MEAL-03 because there's no lexical overlap, only semantic
+drift. The fix is hybrid retrieval: combine BM25 (catches keyword
+matches) with the vector search (catches semantic ones), then rerank.
+This matters more than it sounds — in a compliance system, a missed
+policy citation isn't just a UX bug, it's a wrong decision.
+
+**2. Authentication.** Right now any caller can approve or reject
+any submission — there's no identity check at all. This is the
+single biggest gap before this could touch real money. JWT
+verification belongs at the Nginx gateway, with roles scoped to
+`submitter` / `approver` / `admin`, so unauthorized requests never
+even reach the services.
+
+**3. Saga observability.** The choreography-based saga (ADR-002) is
+clean architecturally but opaque operationally — if a submission
+gets stuck, there's no single place that shows "payment is waiting
+on approval, which is waiting on X." I'd add a state-machine view to
+the audit service, keyed by correlation_id, so the full saga state
+is visible at a glance instead of reconstructed by hand from events.
+
+**What I'd deliberately skip for now:** OpenTelemetry. It's valuable,
+but it's mostly plumbing — distributed traces are far more useful
+once there's an identity attached to each request, so I'd only add
+it after auth is in place.
