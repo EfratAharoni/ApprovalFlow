@@ -105,6 +105,29 @@ Expected output:
 | Duplicate | INV-1007 — re-submit same invoice | Same `tracking_id` returned, paid once |
 | Payment failure | INV-1012 — $9,500 hardware | `PAYMENT_FAILED`, budget fully restored |
 
+## API Documentation
+
+FastAPI generates interactive OpenAPI docs automatically. With the system running:
+
+| Service | Swagger UI | Port |
+|---|---|---|
+| Submission | http://localhost:8001/docs | 8001 |
+| AI Agent | http://localhost:8002/docs | 8002 |
+| Approval | http://localhost:8003/docs | 8003 |
+| Payment | http://localhost:8004/docs | 8004 |
+| Audit | http://localhost:8005/docs | 8005 |
+
+All external requests route through the API Gateway (`http://localhost:8000`) — see full routing in [`services/api-gateway/nginx.conf`](services/api-gateway/nginx.conf).
+The individual `/docs` endpoints are accessible directly for development and are not exposed through the gateway in production.
+
+### Concurrent load test (rate-limiting + budget CAS)
+
+```bash
+python scripts/load_test.py
+```
+
+Sends 30 parallel requests to verify Nginx rate-limiting fires (429), then runs 5 concurrent $600 submissions against a $1,000 department budget to exercise the Dapr CAS lock (M6 + M13).
+
 ## Architecture Decisions
 
 See [`docs/adr/`](docs/adr/) for all key decisions:

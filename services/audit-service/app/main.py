@@ -125,17 +125,49 @@ async def on_payment_failed(request: Request) -> dict:
 
 # ─── Query endpoints ──────────────────────────────────────────────────────────
 
-@app.get("/audit/prove-ceiling")
+@app.get(
+    "/audit/prove-ceiling",
+    summary="Proof that the autonomy ceiling was never breached",
+    description=(
+        "Scans all recorded audit events and verifies that no submission was auto-approved "
+        "above the configured `AUTONOMY_CEILING` ($250). Returns `violation_found: false` if the "
+        "ceiling held for every decision in the audit log. This is the cryptographic proof of M12. "
+        "**Possible responses:** 200 OK."
+    ),
+    responses={200: {"description": "Ceiling compliance check result"}},
+)
 async def prove_ceiling() -> dict:
     return await _svc.prove_ceiling()
 
 
-@app.get("/audit/dashboard")
+@app.get(
+    "/audit/dashboard",
+    summary="Aggregated submission statistics",
+    description=(
+        "Returns a real-time dashboard with counts and breakdowns across all submissions: "
+        "total processed, auto-approved, escalated, rejected, paid, failed. "
+        "**Possible responses:** 200 OK."
+    ),
+    responses={200: {"description": "Dashboard statistics"}},
+)
 async def dashboard() -> dict:
     return await _svc.get_dashboard()
 
 
-@app.get("/audit/{submission_id}")
+@app.get(
+    "/audit/{submission_id}",
+    summary="Full audit trail for a submission",
+    description=(
+        "Returns the complete chronological event history for a submission: "
+        "submission.created → decision.made → approval.decided (if escalated) → "
+        "payment.completed | payment.failed. Each event includes timestamp, topic, and payload snapshot. "
+        "**Possible responses:** 200 OK, 404 Not Found."
+    ),
+    responses={
+        200: {"description": "Chronological list of audit events"},
+        404: {"description": "No audit events found for this submission"},
+    },
+)
 async def get_trail(submission_id: str) -> list:
     trail = await _svc.get_trail(submission_id)
     if not trail:

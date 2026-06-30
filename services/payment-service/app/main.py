@@ -142,20 +142,39 @@ async def handle_decision_made(request: Request) -> dict:
 
 # ─── Test-support endpoints (verify script only, not behind gateway) ─────────
 
-@app.post("/_test/inject-failure/{submission_id}")
+@app.post(
+    "/_test/inject-failure/{submission_id}",
+    summary="[Test only] Inject a payment gateway failure",
+    description=(
+        "Registers a runtime failure for the given submission ID. "
+        "The payment-service will simulate a gateway failure when it processes this submission, "
+        "triggering the budget-release compensating transaction. "
+        "Not exposed through the API Gateway — test/verify scripts access port 8004 directly."
+    ),
+    tags=["Test Support"],
+)
 async def test_inject_failure(submission_id: str) -> dict:
     _inject.register(submission_id)
     logger.warning("failure injection registered", extra={"submission_id": submission_id})
     return {"ok": True, "submission_id": submission_id}
 
 
-@app.delete("/_test/inject-failure/{submission_id}")
+@app.delete(
+    "/_test/inject-failure/{submission_id}",
+    summary="[Test only] Clear an injected payment failure",
+    tags=["Test Support"],
+)
 async def test_clear_failure(submission_id: str) -> dict:
     _inject.clear(submission_id)
     return {"ok": True, "submission_id": submission_id}
 
 
-@app.get("/_test/budget/{department_id}")
+@app.get(
+    "/_test/budget/{department_id}",
+    summary="[Test only] Read department budget from Dapr state",
+    description="Returns the current Dapr state-store balance for a department. Used by the verify script to confirm budget was released after a payment failure.",
+    tags=["Test Support"],
+)
 async def test_get_budget(department_id: str) -> dict:
     from .dapr_client import get_state_with_etag
     data, _ = await get_state_with_etag(f"budget:{department_id}")

@@ -17,7 +17,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/submissions", response_model=SubmissionResponse, status_code=202)
+@router.post(
+    "/submissions",
+    response_model=SubmissionResponse,
+    status_code=202,
+    summary="Submit an expense invoice",
+    description=(
+        "Accepts a new expense invoice for AI-powered policy evaluation. "
+        "Returns immediately with a `tracking_id`; processing is asynchronous via Dapr pub/sub. "
+        "Duplicate submissions (same vendor + invoiceNumber + total + date) are short-circuited "
+        "and return the existing `tracking_id`. "
+        "**Possible responses:** 202 Accepted, 409 Conflict (not used — duplicates return 202), "
+        "422 Validation Error."
+    ),
+    responses={
+        202: {"description": "Submission accepted and queued for processing"},
+        422: {"description": "Invalid request payload"},
+    },
+)
 async def create_submission(
     req: SubmissionRequest,
     db: AsyncSession = Depends(get_db),
@@ -134,7 +151,21 @@ async def create_submission(
     return SubmissionResponse(tracking_id=tracking_id, status="PENDING")
 
 
-@router.get("/submissions/{tracking_id}", response_model=StatusResponse)
+@router.get(
+    "/submissions/{tracking_id}",
+    response_model=StatusResponse,
+    summary="Get submission status",
+    description=(
+        "Returns the current processing status of a submitted invoice. "
+        "Statuses: `PENDING` → `AUTO_APPROVED` | `ESCALATED` | `REJECTED` | `DUPLICATE` → `PAID` | `PAYMENT_FAILED`. "
+        "Poll this endpoint after submitting to track progress. "
+        "**Possible responses:** 200 OK, 404 Not Found."
+    ),
+    responses={
+        200: {"description": "Current submission status and metadata"},
+        404: {"description": "Submission not found"},
+    },
+)
 async def get_status(
     tracking_id: str,
     db: AsyncSession = Depends(get_db),

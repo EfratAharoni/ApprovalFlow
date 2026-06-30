@@ -140,12 +140,33 @@ async def handle_decision_made(request: Request) -> dict:
 
 # ─── Approver API endpoints ───────────────────────────────────────────────────
 
-@app.get("/approvals/queue")
+@app.get(
+    "/approvals/queue",
+    summary="List pending human-review tasks",
+    description=(
+        "Returns all submissions currently awaiting human approval. "
+        "Each item includes the vendor, amount, category, and policy violations detected by the AI agent. "
+        "**Possible responses:** 200 OK (empty list if queue is empty)."
+    ),
+    responses={200: {"description": "List of pending approval tasks"}},
+)
 async def get_queue() -> list:
     return await _svc.get_queue()
 
 
-@app.get("/approvals/{submission_id}")
+@app.get(
+    "/approvals/{submission_id}",
+    summary="Get approval task for a submission",
+    description=(
+        "Returns the approval task details for a specific submission, including the AI agent's "
+        "reasoning, confidence score, and detected policy violations. "
+        "**Possible responses:** 200 OK, 404 Not Found."
+    ),
+    responses={
+        200: {"description": "Approval task details"},
+        404: {"description": "No approval task found for this submission"},
+    },
+)
 async def get_approval(submission_id: str) -> dict:
     task = await _svc.get_task(submission_id)
     if task is None:
@@ -153,7 +174,22 @@ async def get_approval(submission_id: str) -> dict:
     return task
 
 
-@app.post("/approvals/{submission_id}/decide")
+@app.post(
+    "/approvals/{submission_id}/decide",
+    summary="Approve or reject a human-review task",
+    description=(
+        "Records a human decision (APPROVE or REJECT) for a submission in the human-review queue. "
+        "An APPROVE decision triggers the payment saga via `approval.decided` pub/sub event. "
+        "A REJECT decision closes the submission with status REJECTED. "
+        "**Possible responses:** 200 OK, 400 Bad Request (invalid action or task already decided), "
+        "404 Not Found."
+    ),
+    responses={
+        200: {"description": "Decision recorded and downstream event published"},
+        400: {"description": "Invalid action or task is not in PENDING state"},
+        404: {"description": "No approval task found for this submission"},
+    },
+)
 async def decide(submission_id: str, body: DecideRequest, request: Request) -> dict:
     correlation_id = request.headers.get("X-Correlation-ID", str(uuid.uuid4()))
     logger.info(
