@@ -77,10 +77,15 @@ export default function StatusPage({ setCurrentPage }) {
     setTimeout(() => setCopied(false), 2000)
   }
 
+  const wasEscalated = data && (
+    data.status === 'ESCALATED' ||
+    data.status === 'TIMED_OUT' ||
+    (data.plain_language_reason && !data.plain_language_reason.toLowerCase().startsWith('automatically'))
+  )
   const steps = data ? [
     { label: 'Submitted', value: data.submitted_at ? new Date(data.submitted_at).toLocaleString() : '—', done: true },
-    { label: `AI Decision${data.plain_language_reason ? '' : ''}`, value: data.plain_language_reason || 'Processing...', done: !PROCESSING_STATUSES.includes(data.status), active: data.status === 'PENDING' },
-    { label: 'Human Review', value: data.status === 'ESCALATED' ? 'Awaiting approver' : data.status === 'TIMED_OUT' ? 'Timed out' : undefined, done: ['APPROVED', 'REJECTED', 'PAID', 'PAYMENT_FAILED'].includes(data.status), active: data.status === 'ESCALATED' },
+    { label: 'AI Decision', value: data.plain_language_reason || 'Processing...', done: !PROCESSING_STATUSES.includes(data.status), active: data.status === 'PENDING' },
+    ...(wasEscalated ? [{ label: 'Human Review', value: data.status === 'ESCALATED' ? 'Awaiting approver' : data.status === 'TIMED_OUT' ? 'Timed out' : undefined, done: ['APPROVED', 'REJECTED', 'PAID', 'PAYMENT_FAILED'].includes(data.status), active: data.status === 'ESCALATED' }] : []),
     { label: 'Payment', value: data.external_payment_ref ? `Ref: ${data.external_payment_ref}` : undefined, done: data.status === 'PAID', active: data.status === 'APPROVED' },
   ] : []
 

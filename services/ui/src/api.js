@@ -25,13 +25,16 @@ export async function getQueue() {
   return res.json()
 }
 
-export async function postDecision(submissionId, action, notes) {
+export async function postDecision(submissionId, action, notes, decidedBy = 'ui-approver') {
   const res = await fetch(`${BASE}/approvals/${submissionId}/decide`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ action, notes }),
+    body: JSON.stringify({ action, notes, decided_by: decidedBy }),
   })
-  if (!res.ok) throw new Error('Decision failed')
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ detail: res.statusText }))
+    throw new Error(err.detail ? JSON.stringify(err.detail) : 'Decision failed')
+  }
   return res.json()
 }
 

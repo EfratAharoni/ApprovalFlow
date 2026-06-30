@@ -125,6 +125,13 @@ class AuditService:
             elif route == "duplicate":
                 duplicates += 1
 
+        # Human rejections (approval.decided where action=REJECT)
+        for e in events:
+            if e["event_type"] == "approval.decided" and e["payload"].get("action") == "REJECT":
+                rejected += 1
+                if human_reviewed > 0:
+                    human_reviewed -= 1
+
         # Human-approved payment amounts (from approval.decided where action=APPROVE)
         total_amount_human = 0.0
         for e in events:

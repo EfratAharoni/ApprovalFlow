@@ -34,12 +34,21 @@ export default function DashboardPage({ setCurrentPage }) {
   const [dash, setDash] = useState(null)
   const [ceiling, setCeiling] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
+
+  async function fetchData(showSpinner = false) {
+    if (showSpinner) setRefreshing(true)
+    try {
+      const [d, c] = await Promise.all([getDashboard(), proveCeiling()])
+      setDash(d); setCeiling(c)
+    } catch {}
+    finally { setLoading(false); setRefreshing(false) }
+  }
 
   useEffect(() => {
-    Promise.all([getDashboard(), proveCeiling()])
-      .then(([d, c]) => { setDash(d); setCeiling(c) })
-      .catch(() => {})
-      .finally(() => setLoading(false))
+    fetchData()
+    const id = setInterval(() => fetchData(), 10000)
+    return () => clearInterval(id)
   }, [])
 
   if (loading) {
@@ -72,6 +81,18 @@ export default function DashboardPage({ setCurrentPage }) {
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header with refresh */}
+      <div className="flex items-center justify-end">
+        <button
+          onClick={() => fetchData(true)}
+          disabled={refreshing}
+          className="flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:bg-white/5 disabled:opacity-50"
+          style={{ border: '1px solid #2D3148', color: '#94A3B8' }}
+        >
+          <RefreshCw size={12} className={refreshing ? 'animate-spin' : ''} />
+          Refresh
+        </button>
+      </div>
       {/* KPI row */}
       <div className="grid grid-cols-4 gap-4">
         <KPICard label="Total Submissions" value={total} icon={TrendingUp} color="#6366F1" />
