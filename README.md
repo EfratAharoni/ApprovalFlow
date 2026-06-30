@@ -126,7 +126,7 @@ The individual `/docs` endpoints are accessible directly for development and are
 python scripts/load_test.py
 ```
 
-Sends 30 parallel requests to verify Nginx rate-limiting fires (429), then runs 5 concurrent $600 submissions against a $1,000 department budget to exercise the Dapr CAS lock (M6 + M13).
+Sends 30 parallel requests to verify Nginx rate-limiting fires (returns 503 by default; add `limit_req_status 429;` to nginx.conf for 429), then runs 5 concurrent $600 submissions against a $1,000 department budget to exercise the Dapr CAS lock (M6 + M13).
 
 ## Architecture Decisions
 

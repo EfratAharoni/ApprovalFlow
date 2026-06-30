@@ -6,18 +6,27 @@ Run against a live system: docker compose up -d --wait
 
 Usage:
     python scripts/load_test.py
+
+Note: Nginx returns 503 (not 429) by default for rate-limited requests.
+Add `limit_req_status 429;` to nginx.conf to change this.
 """
 import asyncio
+import sys
 import time
 from collections import Counter
+from typing import Union
 
 import httpx
+
+# Force UTF-8 so emoji/unicode render on Windows
+if hasattr(sys.stdout, "reconfigure"):
+    sys.stdout.reconfigure(encoding="utf-8")
 
 BASE_URL = "http://localhost:8000"
 PAYMENT_DIRECT = "http://localhost:8004"
 
 
-async def submit_one(client: httpx.AsyncClient, i: int) -> int | str:
+async def submit_one(client: httpx.AsyncClient, i: int) -> Union[int, str]:
     payload = {
         "id": f"LOAD-TEST-{i}",
         "vendor": "Bistro 19",
@@ -53,12 +62,18 @@ async def main() -> None:
         )
     counts = Counter(results)
     print(f"  Status code distribution: {dict(counts)}")
-    print(f"  202 (accepted):     {counts.get(202, 0)}")
-    print(f"  429 (rate limited): {counts.get(429, 0)}")
-    if counts.get(429, 0) > 0:
-        print("  PASS — Nginx rate-limiter fired correctly (M6)")
+    rate_limited = counts.get(429, 0) + counts.get(503, 0)
+    print(f"  202 (accepted):          {counts.get(202, 0)}")
+    print(f"  429/503 (rate limited):  {rate_limited}")
+    print(f"    429: {counts.get(429, 0)}  503: {counts.get(503, 0)}")
+    if rate_limited > 0:
+        if counts.get(503, 0) > 0 and counts.get(429, 0) == 0:
+            print("  PASS — Nginx rate-limiter fired (M6). Returned 503 (nginx default).")
+            print("         Add `limit_req_status 429;` to nginx.conf to get 429 instead.")
+        else:
+            print("  PASS — Nginx rate-limiter fired correctly (M6).")
     else:
-        print("  NOTE — No 429s observed; burst may be within limit_req burst=20 window")
+        print("  NOTE — No rate-limiting observed; all requests fit within burst=20 window")
 
     # ── Test 2: Concurrent budget — 5x $600 against marketing ($1000) ─────────
     print("\nTest 2: Concurrent budget — 5x $600 against marketing-2026Q2 ($1000)")
@@ -71,7 +86,7 @@ async def main() -> None:
             timeout=10,
         )
         if reset.status_code == 200:
-            print("  Budget reset to $1000 ✓")
+            print("  Budget reset to $1000 [OK]")
         else:
             print(f"  WARNING: budget reset returned {reset.status_code}")
 
