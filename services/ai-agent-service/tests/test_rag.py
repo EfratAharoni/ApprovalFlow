@@ -7,7 +7,7 @@ These tests run offline once the sentence-transformers model is cached locally
 Run: pytest services/ai-agent-service/tests/test_rag.py -v
 """
 import pytest
-from app.rag import PolicyIndex, POLICY_CHUNKS
+from app.rag import PolicyIndex
 
 
 @pytest.fixture(scope="module")
