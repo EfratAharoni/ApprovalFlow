@@ -1,0 +1,189 @@
+{
+  "run_at": "2026-07-01T18:35:33.237953+00:00",
+  "total": 20,
+  "passed": 20,
+  "failed": 0,
+  "accuracy": 1.0,
+  "results": [
+    {
+      "fixture_id": "INV-1001",
+      "expected_route": "auto_approve",
+      "actual_route": "auto_approve",
+      "actual_status": "PAID",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2069.9
+    },
+    {
+      "fixture_id": "INV-1002",
+      "expected_route": "auto_approve",
+      "actual_route": "auto_approve",
+      "actual_status": "PAID",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2125.4
+    },
+    {
+      "fixture_id": "INV-1003",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2121.0
+    },
+    {
+      "fixture_id": "INV-1004",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2135.8
+    },
+    {
+      "fixture_id": "INV-1005",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2157.6
+    },
+    {
+      "fixture_id": "INV-1006",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2126.7
+    },
+    {
+      "fixture_id": "INV-1007",
+      "expected_route": "duplicate",
+      "actual_route": "duplicate",
+      "actual_status": "DUPLICATE",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 65.0
+    },
+    {
+      "fixture_id": "INV-1008",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2131.2
+    },
+    {
+      "fixture_id": "INV-1009",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2136.1
+    },
+    {
+      "fixture_id": "INV-1010",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2118.5
+    },
+    {
+      "fixture_id": "INV-1011",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2136.9
+    },
+    {
+      "fixture_id": "INV-1012",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2105.8
+    },
+    {
+      "fixture_id": "INV-1013",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2078.6
+    },
+    {
+      "fixture_id": "INV-1015",
+      "expected_route": "reject",
+      "actual_route": "reject",
+      "actual_status": "REJECTED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2122.9
+    },
+    {
+      "fixture_id": "INV-1016",
+      "expected_route": "auto_approve",
+      "actual_route": "auto_approve",
+      "actual_status": "PAID",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2129.0
+    },
+    {
+      "fixture_id": "INV-1017",
+      "expected_route": "auto_approve",
+      "actual_route": "auto_approve",
+      "actual_status": "PAID",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2061.4
+    },
+    {
+      "fixture_id": "INV-1018",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2052.1
+    },
+    {
+      "fixture_id": "INV-1019",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2121.1
+    },
+    {
+      "fixture_id": "INV-1014A",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2132.0
+    },
+    {
+      "fixture_id": "INV-1014B",
+      "expected_route": "human_review",
+      "actual_route": "human_review",
+      "actual_status": "ESCALATED",
+      "passed": true,
+      "reason": "",
+      "processing_time_ms": 2064.3
+    }
+  ]
+}

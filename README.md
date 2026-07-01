@@ -46,6 +46,7 @@ graph TD
 | API Gateway | Nginx (rate-limiting) |
 | UI | React + Vite + Tailwind CSS |
 | CI | GitHub Actions |
+| CD | GitHub Container Registry (GHCR) — auto-publish on green CI |
 
 ## How to Run
 
@@ -117,6 +118,17 @@ Tests full journeys end-to-end through the API gateway:
 auto-approve flow, audit trail completeness, ceiling proof,
 and the adversarial-note anti-cheese guard.
 
+### Eval harness — all 19 fixtures (B1)
+
+```bash
+docker compose up -d --wait
+python scripts/eval.py
+```
+
+Runs every labeled fixture from `sample-invoices.json` against the live system,
+compares actual routing decisions against `expected.route`, and prints an
+accuracy report. Saves a machine-readable report to `docs/eval-report.json`.
+
 ### The 4 journeys
 
 | Journey | Fixture | Expected outcome |
@@ -148,6 +160,40 @@ python scripts/load_test.py
 ```
 
 Sends 30 parallel requests to verify Nginx rate-limiting fires (returns 503 by default; add `limit_req_status 429;` to nginx.conf for 429), then runs 5 concurrent $600 submissions against a $1,000 department budget to exercise the Dapr CAS lock (M6 + M13).
+
+## Authentication
+
+JWT verification is enforced at the Nginx API Gateway layer — services themselves stay stateless and role-unaware.
+
+| Role | Username | Password | Access |
+|---|---|---|---|
+| Submitter | dana | pass123 | submit + status only |
+| Approver | lena | pass123 | submit + approve/reject/request-info |
+| Admin | admin | admin123 | full access |
+
+### Get a token
+
+```bash
+curl -X POST http://localhost:8000/auth/token \
+  -H "Content-Type: application/json" \
+  -d '{"username":"lena","password":"pass123","role":"approver"}'
+# → {"access_token":"<jwt>","token_type":"bearer"}
+```
+
+### Use the token
+
+```bash
+curl -X POST http://localhost:8000/approvals/<id>/decide \
+  -H "Authorization: Bearer <token>" \
+  -H "Content-Type: application/json" \
+  -d '{"action":"APPROVE","decided_by":"lena","notes":"Approved"}'
+```
+
+Protected endpoints (approver or admin only):
+- `POST /approvals/{id}/decide`
+
+Open endpoints (no auth required):
+- `POST /submissions`, `GET /submissions/{id}`, `GET /approvals/queue`, `GET /audit/*`, `GET /health`
 
 ## Architecture Decisions
 

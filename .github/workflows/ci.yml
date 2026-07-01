@@ -98,3 +98,44 @@ jobs:
       - name: Tear down
         if: always()
         run: docker compose down -v
+
+  # ── N2: CD — publish images to GHCR on green main ─────────────────────────
+  publish:
+    runs-on: ubuntu-latest
+    needs: verify
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push all service images
+        run: |
+          REPO="ghcr.io/${{ github.repository_owner }}/approvalflow"
+          SHA="${{ github.sha }}"
+
+          services=(
+            "submission-service"
+            "ai-agent-service"
+            "approval-service"
+            "payment-service"
+            "audit-service"
+          )
+
+          for svc in "${services[@]}"; do
+            docker build \
+              -t "$REPO/$svc:$SHA" \
+              -t "$REPO/$svc:latest" \
+              services/$svc/
+            docker push "$REPO/$svc:$SHA"
+            docker push "$REPO/$svc:latest"
+          done

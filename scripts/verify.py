@@ -56,10 +56,27 @@ def section(title: str) -> None:
 
 # ── HTTP helpers ───────────────────────────────────────────────────────────────
 
-async def post(client: httpx.AsyncClient, path: str, data: dict, base: str = BASE) -> dict:
-    r = await client.post(f"{base}{path}", json=data, timeout=15)
+async def post(
+    client: httpx.AsyncClient,
+    path: str,
+    data: dict,
+    base: str = BASE,
+    headers: Optional[dict] = None,
+) -> dict:
+    r = await client.post(f"{base}{path}", json=data, timeout=15, headers=headers or {})
     r.raise_for_status()
     return r.json()
+
+
+async def get_approver_token(client: httpx.AsyncClient) -> str:
+    """Obtain a JWT for the approver role (required by /approvals/{id}/decide)."""
+    resp = await client.post(
+        f"{BASE}/auth/token",
+        json={"username": "lena", "password": "pass123", "role": "approver"},
+        timeout=10,
+    )
+    resp.raise_for_status()
+    return resp.json()["access_token"]
 
 
 async def get(client: httpx.AsyncClient, path: str, base: str = BASE) -> Any:
@@ -243,7 +260,7 @@ async def journey1(client: httpx.AsyncClient) -> tuple:
 # JOURNEY 2 — Escalate and resume (INV-1003, $1820 client dinner)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def journey2(client: httpx.AsyncClient) -> None:
+async def journey2(client: httpx.AsyncClient, approver_token: str) -> None:
     section("Journey 2 — Escalate & Resume (INV-1003, $1820 client dinner)")
 
     try:
@@ -273,12 +290,13 @@ async def journey2(client: httpx.AsyncClient) -> None:
     else:
         submission_id = queue_item.get("submission_id", tracking_id)
 
-    # Approve
+    # Approve (requires approver JWT)
     try:
         decide_resp = await post(
             client,
             f"/approvals/{submission_id}/decide",
             {"action": "APPROVE", "decided_by": "verify-script", "notes": "Approved for verification"},
+            headers={"Authorization": f"Bearer {approver_token}"},
         )
         check("POST /approvals/{id}/decide APPROVE → 200",
               decide_resp.get("status") in ("APPROVED", "PENDING", "APPROVE"),
@@ -350,7 +368,7 @@ async def journey3(client: httpx.AsyncClient, tracking_id_1001: str, suffix_1001
 # JOURNEY 4 — Payment failure + compensation (INV-1012, $9500 hardware)
 # ══════════════════════════════════════════════════════════════════════════════
 
-async def journey4(client: httpx.AsyncClient) -> None:
+async def journey4(client: httpx.AsyncClient, approver_token: str) -> None:
     section("Journey 4 — Payment failure + compensation (INV-1012, $9500 hardware)")
 
     # Get budget before test
@@ -397,6 +415,7 @@ async def journey4(client: httpx.AsyncClient) -> None:
             client,
             f"/approvals/{submission_id}/decide",
             {"action": "APPROVE", "decided_by": "verify-script", "notes": "Approved for payment failure test"},
+            headers={"Authorization": f"Bearer {approver_token}"},
         )
         check("POST /approvals/{id}/decide APPROVE → 200", True)
     except Exception as e:
@@ -578,11 +597,20 @@ async def main() -> None:
             except Exception as e:
                 print(f"    {dept}: reset failed — {e}")
 
+        # Obtain approver JWT (required for /approvals/{id}/decide)
+        try:
+            approver_token = await get_approver_token(client)
+            print(f"  Auth: ✅ approver token obtained")
+        except Exception as e:
+            print(f"  Auth: ⚠️  could not get approver token — {e}")
+            print("  (auth-service may not be running; /decide calls will be attempted without token)")
+            approver_token = ""
+
         # Run all journeys
         tracking_id_1001, suffix_1001 = await journey1(client)
-        await journey2(client)
+        await journey2(client, approver_token)
         await journey3(client, tracking_id_1001, suffix_1001)
-        await journey4(client)
+        await journey4(client, approver_token)
         await anti_cheese_guards(client)
 
     # ── Final summary ──────────────────────────────────────────────────────────

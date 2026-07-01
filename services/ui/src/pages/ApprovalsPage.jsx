@@ -1,8 +1,85 @@
 import React, { useState, useEffect, useCallback } from 'react'
-import { RefreshCw, Check, X, HelpCircle } from 'lucide-react'
+import { RefreshCw, Check, X, HelpCircle, LogIn, LogOut } from 'lucide-react'
 import { Dialog, Transition } from '@headlessui/react'
-import { getQueue, postDecision } from '../api'
+import { getQueue, postDecision, getToken } from '../api'
 import ConfidenceBar from '../components/ConfidenceBar'
+
+const TOKEN_KEY = 'approvalflow_token'
+const ROLE_KEY  = 'approvalflow_role'
+const USER_KEY  = 'approvalflow_user'
+
+function LoginForm({ onLogin }) {
+  const [username, setUsername] = useState('lena')
+  const [password, setPassword] = useState('')
+  const [error, setError] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    setError('')
+    setLoading(true)
+    try {
+      const data = await getToken(username, password, 'approver')
+      onLogin(data.access_token, username)
+    } catch (err) {
+      setError(err.message || 'Login failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="max-w-sm mx-auto mt-16">
+      <div className="rounded-2xl p-8 space-y-6" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
+        <div className="text-center">
+          <LogIn size={32} className="mx-auto mb-3" style={{ color: '#6366F1' }} />
+          <h2 className="text-lg font-semibold" style={{ color: '#F8FAFC' }}>Approver Login</h2>
+          <p className="text-xs mt-1" style={{ color: '#94A3B8' }}>JWT required to access approval queue</p>
+        </div>
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#94A3B8' }}>Username</label>
+            <input
+              type="text"
+              value={username}
+              onChange={e => setUsername(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+              style={{ background: '#0F1117', border: '1px solid #2D3148', color: '#F8FAFC' }}
+              required
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium mb-1.5" style={{ color: '#94A3B8' }}>Password</label>
+            <input
+              type="password"
+              value={password}
+              onChange={e => setPassword(e.target.value)}
+              className="w-full px-3 py-2.5 rounded-lg text-sm outline-none"
+              style={{ background: '#0F1117', border: '1px solid #2D3148', color: '#F8FAFC' }}
+              required
+            />
+          </div>
+          {error && (
+            <p className="text-xs px-3 py-2 rounded-lg" style={{ background: '#EF444420', color: '#EF4444' }}>
+              {error}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full py-2.5 rounded-lg text-sm font-semibold text-white transition-all duration-200 disabled:opacity-50"
+            style={{ background: '#6366F1' }}
+          >
+            {loading ? 'Signing in...' : 'Sign in'}
+          </button>
+        </form>
+        <p className="text-xs text-center" style={{ color: '#94A3B8' }}>
+          Hint: <span className="font-mono" style={{ color: '#6366F1' }}>lena / pass123</span>
+        </p>
+      </div>
+    </div>
+  )
+}
 
 const CATEGORY_COLORS = {
   meals: { bg: '#F59E0B20', color: '#F59E0B' },
@@ -101,11 +178,30 @@ function DecisionModal({ item, action, onClose, onConfirm }) {
 
 export default function ApprovalsPage({ setCurrentPage }) {
   React.useEffect(() => setCurrentPage('Approvals'), [])
+  const [token, setToken] = useState(() => localStorage.getItem(TOKEN_KEY) || '')
+  const [loggedInUser, setLoggedInUser] = useState(() => localStorage.getItem(USER_KEY) || '')
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(true)
   const [lastUpdated, setLastUpdated] = useState(null)
   const [modal, setModal] = useState(null)
   const [dismissed, setDismissed] = useState(new Set())
+
+  function handleLogin(accessToken, username) {
+    localStorage.setItem(TOKEN_KEY, accessToken)
+    localStorage.setItem(USER_KEY, username)
+    localStorage.setItem(ROLE_KEY, 'approver')
+    setToken(accessToken)
+    setLoggedInUser(username)
+  }
+
+  function handleLogout() {
+    localStorage.removeItem(TOKEN_KEY)
+    localStorage.removeItem(USER_KEY)
+    localStorage.removeItem(ROLE_KEY)
+    setToken('')
+    setLoggedInUser('')
+    setItems([])
+  }
 
   const load = useCallback(async () => {
     try {
@@ -117,12 +213,21 @@ export default function ApprovalsPage({ setCurrentPage }) {
     finally { setLoading(false) }
   }, [])
 
-  useEffect(() => { load(); const id = setInterval(load, 5000); return () => clearInterval(id) }, [load])
+  useEffect(() => {
+    if (!token) return
+    load()
+    const id = setInterval(load, 5000)
+    return () => clearInterval(id)
+  }, [load, token])
 
   async function handleDecision(submissionId, action, notes) {
-    await postDecision(submissionId, action, notes)
+    await postDecision(submissionId, action, notes, 'ui-approver', token)
     setDismissed(d => new Set([...d, submissionId]))
     setTimeout(() => setItems(prev => prev.filter(i => i.submission_id !== submissionId)), 500)
+  }
+
+  if (!token) {
+    return <LoginForm onLogin={handleLogin} />
   }
 
   const visible = items.filter(i => !dismissed.has(i.submission_id))
@@ -134,9 +239,23 @@ export default function ApprovalsPage({ setCurrentPage }) {
         <h2 className="text-lg font-semibold" style={{ color: '#F8FAFC' }}>
           {visible.length} item{visible.length !== 1 ? 's' : ''} awaiting review
         </h2>
-        <div className="flex items-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
-          <RefreshCw size={12} />
-          {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Loading...'}
+        <div className="flex items-center gap-3">
+          <div className="flex items-center gap-2 text-xs" style={{ color: '#94A3B8' }}>
+            <RefreshCw size={12} />
+            {lastUpdated ? `Last updated: ${lastUpdated.toLocaleTimeString()}` : 'Loading...'}
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-medium px-2 py-1 rounded-full" style={{ background: '#22C55E20', color: '#22C55E' }}>
+              {loggedInUser}
+            </span>
+            <button
+              onClick={handleLogout}
+              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium transition-all duration-200 hover:opacity-80"
+              style={{ background: '#EF444420', color: '#EF4444', border: '1px solid #EF444440' }}
+            >
+              <LogOut size={12} /> Logout
+            </button>
+          </div>
         </div>
       </div>
 
