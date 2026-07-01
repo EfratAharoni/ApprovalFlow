@@ -4,6 +4,9 @@ Hybrid policy retrieval — BM25 + vector search fused 50/50.
 Why hybrid: BM25 handles keyword overlap ("alcohol" → MEAL-03);
 vector handles semantic drift ("happy hour beverages" → MEAL-03).
 Either alone misses one of these cases (documented in ADR-008).
+
+Model is lazy-loaded on first use so that importing this module in CI
+(unit-test phase, no network) does not trigger a HuggingFace download.
 """
 from __future__ import annotations
 
@@ -13,12 +16,20 @@ from sentence_transformers import SentenceTransformer
 
 from .policy import POLICY_RULES
 
-_model = SentenceTransformer("all-MiniLM-L6-v2")
+# Initialised on first call to _get_model(); None until then.
+_model: SentenceTransformer | None = None
 
 POLICY_CHUNKS: list[dict] = [
     {"id": rule_id, "text": text}
     for rule_id, text in POLICY_RULES.items()
 ]
+
+
+def _get_model() -> SentenceTransformer:
+    global _model
+    if _model is None:
+        _model = SentenceTransformer("all-MiniLM-L6-v2")
+    return _model
 
 
 class PolicyIndex:
@@ -27,7 +38,7 @@ class PolicyIndex:
         texts = [c["text"] for c in self.chunks]
 
         # Vector index — cast to ndarray so mypy can verify @ operator usage
-        self.embeddings: np.ndarray = np.array(_model.encode(texts))
+        self.embeddings: np.ndarray = np.array(_get_model().encode(texts))
 
         # BM25 index
         tokenized = [t.lower().split() for t in texts]
@@ -35,7 +46,7 @@ class PolicyIndex:
 
     def search(self, query: str, top_k: int = 3) -> list[dict]:
         # Vector scores — cast to ndarray so mypy can verify @ operator usage
-        q_emb: np.ndarray = np.array(_model.encode([query])[0])
+        q_emb: np.ndarray = np.array(_get_model().encode([query])[0])
         norms = np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(q_emb)
         vector_scores = np.array(self.embeddings @ q_emb) / np.where(norms == 0, 1e-9, norms)
 
@@ -55,7 +66,3 @@ class PolicyIndex:
             {**self.chunks[i], "score": float(combined[i])}
             for i in top_indices
         ]
-
-
-# Module-level singleton — built once at import time, reused across requests.
-policy_index = PolicyIndex()

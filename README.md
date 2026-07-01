@@ -206,6 +206,8 @@ See [`docs/adr/`](docs/adr/) for all key decisions:
 - **ADR-005** — Dapr state store for durable HITL pause/resume
 - **ADR-006** — Shared PostgreSQL with separate schemas
 - **ADR-007** — Nginx API gateway
+- **ADR-008** — Hybrid BM25 + vector policy retrieval
+- **ADR-009** — JWT authentication at the gateway (not in services)
 
 ## Autonomy Posture
 
@@ -228,29 +230,25 @@ curl http://localhost:8000/audit/prove-ceiling
 
 Given another week, I'd prioritize three things, roughly in this order:
 
-**1. RAG quality.** The current embedding-only retrieval has a known
-gap, documented in ADR-008 — a query like "team happy hour beverages"
-misses MEAL-03 because there's no lexical overlap, only semantic
-drift. The fix is hybrid retrieval: combine BM25 (catches keyword
-matches) with the vector search (catches semantic ones), then rerank.
-This matters more than it sounds — in a compliance system, a missed
-policy citation isn't just a UX bug, it's a wrong decision.
-
-**2. Authentication.** Right now any caller can approve or reject
-any submission — there's no identity check at all. This is the
-single biggest gap before this could touch real money. JWT
-verification belongs at the Nginx gateway, with roles scoped to
-`submitter` / `approver` / `admin`, so unauthorized requests never
-even reach the services.
-
-**3. Saga observability.** The choreography-based saga (ADR-002) is
+**1. Saga observability.** The choreography-based saga (ADR-002) is
 clean architecturally but opaque operationally — if a submission
 gets stuck, there's no single place that shows "payment is waiting
 on approval, which is waiting on X." I'd add a state-machine view to
 the audit service, keyed by correlation_id, so the full saga state
 is visible at a glance instead of reconstructed by hand from events.
 
-**What I'd deliberately skip for now:** OpenTelemetry. It's valuable,
-but it's mostly plumbing — distributed traces are far more useful
-once there's an identity attached to each request, so I'd only add
-it after auth is in place.
+**2. OpenTelemetry distributed tracing.** Now that auth is in place
+and every request has an identity attached, distributed traces become
+genuinely useful — you can correlate a latency spike to a specific
+user, service hop, or LLM call. Without auth, traces are anonymous
+and much harder to act on.
+
+**3. RAG reranking.** The current hybrid BM25 + vector fusion uses a
+fixed 0.5/0.5 weight. A lightweight cross-encoder reranker on the
+top-10 candidates would improve precision further, especially for
+multi-keyword policy queries where the fusion weights are a rough
+heuristic.
+
+**What's already shipped:** hybrid RAG (BM25 + vector, ADR-008),
+JWT authentication at the Nginx gateway (ADR-009), eval harness
+with 100% accuracy on all 19 fixtures (B1), and CD to GHCR (N2).

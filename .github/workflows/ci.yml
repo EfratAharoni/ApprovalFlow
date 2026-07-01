@@ -2,8 +2,10 @@ name: CI
 
 # Test strategy (N6):
 #   quality-gates job — unit tests only (offline, no containers needed)
-#   verify job        — integration + e2e tests run here after docker compose up
-#                       (pytest tests/integration and tests/e2e require running containers)
+#                       test_rag.py excluded here — it requires the
+#                       sentence-transformers model (network/heavy download);
+#                       RAG tests run in the verify job instead.
+#   verify job        — integration + e2e + RAG tests after docker compose up
 
 on:
   push:
@@ -49,7 +51,14 @@ jobs:
         run: |
           for service in submission-service ai-agent-service \
             approval-service payment-service audit-service; do
-            (cd services/$service && pytest tests -v --tb=short)
+            if [ "$service" = "ai-agent-service" ]; then
+              # test_rag.py needs the sentence-transformers model (network);
+              # run those in the verify job instead.
+              (cd services/$service && pytest tests -v --tb=short \
+                --ignore=tests/test_rag.py)
+            else
+              (cd services/$service && pytest tests -v --tb=short)
+            fi
           done
 
       - name: Build Docker images
@@ -68,7 +77,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install verify dependencies
-        run: pip install httpx --quiet
+        run: pip install httpx pytest pytest-asyncio anyio --quiet
 
       - name: Start system
         run: |
@@ -80,9 +89,6 @@ jobs:
           PAYMENT_FAILURE_INJECT: "inv-1012"
         run: python scripts/verify.py
 
-      - name: Install integration + e2e test dependencies
-        run: pip install httpx pytest --quiet
-
       - name: Integration tests (containers already up)
         run: pytest tests/integration -v -m integration --tb=short
 
@@ -90,6 +96,13 @@ jobs:
         env:
           PAYMENT_FAILURE_INJECT: ""
         run: pytest tests/e2e -v -m e2e --tb=short
+
+      - name: RAG tests (model downloaded inside ai-agent-service container)
+        env:
+          TRANSFORMERS_OFFLINE: "0"
+        run: |
+          pip install sentence-transformers rank_bm25 numpy --quiet
+          cd services/ai-agent-service && pytest tests/test_rag.py -v --tb=short
 
       - name: Dump logs on failure
         if: failure()
@@ -129,6 +142,7 @@ jobs:
             "approval-service"
             "payment-service"
             "audit-service"
+            "auth-service"
           )
 
           for svc in "${services[@]}"; do
