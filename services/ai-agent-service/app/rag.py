@@ -26,16 +26,16 @@ class PolicyIndex:
         self.chunks = chunks if chunks is not None else POLICY_CHUNKS
         texts = [c["text"] for c in self.chunks]
 
-        # Vector index
-        self.embeddings = _model.encode(texts)
+        # Vector index — cast to ndarray so mypy can verify @ operator usage
+        self.embeddings: np.ndarray = np.array(_model.encode(texts))
 
         # BM25 index
         tokenized = [t.lower().split() for t in texts]
         self.bm25 = BM25Okapi(tokenized)
 
     def search(self, query: str, top_k: int = 3) -> list[dict]:
-        # Vector scores
-        q_emb = _model.encode([query])[0]
+        # Vector scores — cast to ndarray so mypy can verify @ operator usage
+        q_emb: np.ndarray = np.array(_model.encode([query])[0])
         norms = np.linalg.norm(self.embeddings, axis=1) * np.linalg.norm(q_emb)
         vector_scores = np.array(self.embeddings @ q_emb) / np.where(norms == 0, 1e-9, norms)
 
