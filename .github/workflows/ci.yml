@@ -120,7 +120,7 @@ jobs:
 
       - name: Build and push all service images
         run: |
-          REPO="ghcr.io/${{ github.repository_owner }}/approvalflow"
+          REPO="ghcr.io/$(echo '${{ github.repository_owner }}' | tr '[:upper:]' '[:lower:]')/approvalflow"
           SHA="${{ github.sha }}"
 
           services=(
