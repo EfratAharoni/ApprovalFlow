@@ -96,6 +96,27 @@ Expected output:
 ✅ ALL CHECKS PASSED — system is verified (33/33)
 ```
 
+### Integration tests (requires docker compose up)
+
+```bash
+docker compose up -d --wait
+pytest tests/integration -v -m integration
+```
+
+Tests real service behaviour against live containers — submission intake,
+pub/sub event flow, and duplicate detection.
+
+### E2E tests (requires docker compose up)
+
+```bash
+docker compose up -d --wait
+pytest tests/e2e -v -m e2e
+```
+
+Tests full journeys end-to-end through the API gateway:
+auto-approve flow, audit trail completeness, ceiling proof,
+and the adversarial-note anti-cheese guard.
+
 ### The 4 journeys
 
 | Journey | Fixture | Expected outcome |

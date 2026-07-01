@@ -1,5 +1,10 @@
 name: CI
 
+# Test strategy (N6):
+#   quality-gates job — unit tests only (offline, no containers needed)
+#   verify job        — integration + e2e tests run here after docker compose up
+#                       (pytest tests/integration and tests/e2e require running containers)
+
 on:
   push:
     branches: ["**"]
@@ -74,6 +79,17 @@ jobs:
         env:
           PAYMENT_FAILURE_INJECT: "inv-1012"
         run: python scripts/verify.py
+
+      - name: Install integration + e2e test dependencies
+        run: pip install httpx pytest --quiet
+
+      - name: Integration tests (containers already up)
+        run: pytest tests/integration -v -m integration --tb=short
+
+      - name: E2E tests (containers already up)
+        env:
+          PAYMENT_FAILURE_INJECT: ""
+        run: pytest tests/e2e -v -m e2e --tb=short
 
       - name: Dump logs on failure
         if: failure()

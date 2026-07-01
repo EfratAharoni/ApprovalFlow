@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { RefreshCw, Shield, TrendingUp, Users, XCircle, CheckCircle, AlertTriangle } from 'lucide-react'
-import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts'
+import { PieChart, Pie, Cell, ResponsiveContainer } from 'recharts'
 import { getDashboard, proveCeiling } from '../api'
 
 function KPICard({ label, value, sub, color, icon: Icon }) {
@@ -16,15 +16,6 @@ function KPICard({ label, value, sub, color, icon: Icon }) {
         <p className="text-3xl font-bold font-mono" style={{ color: '#F8FAFC' }}>{value}</p>
         {sub && <p className="text-sm mt-1" style={{ color: '#94A3B8' }}>{sub}</p>}
       </div>
-    </div>
-  )
-}
-
-const CUSTOM_TOOLTIP = ({ active, payload }) => {
-  if (!active || !payload?.length) return null
-  return (
-    <div className="rounded-lg px-3 py-2 text-sm" style={{ background: '#1A1D27', border: '1px solid #2D3148', color: '#F8FAFC' }}>
-      {payload.map((p, i) => <div key={i}>{p.name}: {p.value}</div>)}
     </div>
   )
 }
@@ -72,12 +63,6 @@ export default function DashboardPage({ setCurrentPage }) {
     { name: 'Rejected', value: dash.rejected || 0, color: '#EF4444' },
     { name: 'Duplicate', value: dash.duplicates || 0, color: '#94A3B8' },
   ].filter(d => d.value > 0)
-
-  // Generate last 7 days bar chart data
-  const days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date(); d.setDate(d.getDate() - (6 - i))
-    return { day: d.toLocaleDateString('en', { weekday: 'short' }), submissions: Math.floor(Math.random() * 20) + 5 }
-  })
 
   return (
     <div className="max-w-5xl mx-auto space-y-6">
@@ -130,17 +115,31 @@ export default function DashboardPage({ setCurrentPage }) {
           )}
         </div>
 
-        {/* Bar chart */}
+        {/* Processing time */}
         <div className="rounded-xl p-5" style={{ background: '#1A1D27', border: '1px solid #2D3148' }}>
-          <h3 className="text-sm font-semibold mb-4" style={{ color: '#F8FAFC' }}>Submissions — Last 7 Days</h3>
-          <ResponsiveContainer width="100%" height={160}>
-            <BarChart data={days} barSize={24}>
-              <XAxis dataKey="day" tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: '#94A3B8', fontSize: 11 }} axisLine={false} tickLine={false} />
-              <Tooltip content={<CUSTOM_TOOLTIP />} />
-              <Bar dataKey="submissions" fill="#6366F1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
+          <h3 className="text-sm font-semibold mb-4" style={{ color: '#F8FAFC' }}>Processing Stats</h3>
+          <div className="space-y-4">
+            <div>
+              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Avg. end-to-end time</p>
+              <p className="text-2xl font-bold font-mono" style={{ color: '#F8FAFC' }}>
+                {dash.avg_processing_time_seconds > 0
+                  ? `${dash.avg_processing_time_seconds.toFixed(1)}s`
+                  : '—'}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Total auto-approved ($)</p>
+              <p className="text-2xl font-bold font-mono" style={{ color: '#22C55E' }}>
+                ${(dash.total_amount_auto_approved || 0).toFixed(2)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wider mb-1" style={{ color: '#94A3B8' }}>Total human-approved ($)</p>
+              <p className="text-2xl font-bold font-mono" style={{ color: '#F59E0B' }}>
+                ${(dash.total_amount_human_approved || 0).toFixed(2)}
+              </p>
+            </div>
+          </div>
         </div>
       </div>
 
